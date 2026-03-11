@@ -1,9 +1,0 @@
-{
-  "Naive Bayes": 0.8973665345397228,
-  "Multi-Layer Perceptron": 0.877625908968489,
-  "K-Nearest Neighbor": 0.737039968346753,
-  "Decision Tree": 0.8645639255371131,
-  "Random Forest": 0.88615804744837,
-  "Support Vector Machine": 0.8905759264559291,
-  "Logistic Regression": 0.8950522463067266
-}
