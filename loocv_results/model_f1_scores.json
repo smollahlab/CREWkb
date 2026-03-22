@@ -1,1 +1,10 @@
-{"Naive Bayes": 0.8973665345397228, "Multi-Layer Perceptron": 0.9037400834323054, "Deep Neural Network": 0.8930876412281796, "K-Nearest Neighbor": 0.8831656125114069, "Decision Tree": 0.885251778507458, "Random Forest": 0.8946369619540351, "Support Vector Machine": 0.8905759264559291, "Logistic Regression": 0.8950522463067266}
+{
+  "Naive Bayes": 0.8973665345397228,
+  "Multi-Layer Perceptron": 0.9037400834323054,
+  "Deep Neural Network": 0.8930876412281796,
+  "K-Nearest Neighbor": 0.8831656125114069,
+  "Decision Tree": 0.885251778507458,
+  "Random Forest": 0.8946369619540351,
+  "Support Vector Machine": 0.8905759264559291,
+  "Logistic Regression": 0.8950522463067266
+}
