@@ -1,2 +1,11 @@
-/__pycache__/*
-/.venv/*
+# WORK ENVIRONMENT
+.venv
+__pycache__
+
+# DEVELOPMENT
+deprecate/
+orig_hpp/
+smote_hpp/
+tuned_hpp/
+best_params.json
+hyperparam_tuning.ipynb

@@ -1,280 +1,377 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.model_selection import LeaveOneOut, StratifiedKFold
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import SelectKBest, VarianceThreshold, f_classif
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.naive_bayes import BernoulliNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.naive_bayes import BernoulliNB
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.pipeline import make_pipeline
 from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score
-from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.pipeline import make_pipeline
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import f1_score
-from sklearn.metrics import confusion_matrix
-import seaborn as sns
+from sklearn.tree import DecisionTreeClassifier
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTEN
+
+from utils import _RANDOM_STATE, _CATEGORICAL_COLS
 
 
+def make_rew_classifier(
+    clf,
+    smote=True,
+    onehot=True,
+    var_filter__threshold=0.16,
+    ft_filter__k=9,
+    random_state=_RANDOM_STATE
+):
+    """Construct a `Pipeline` for REW classification with optional
+    resampling, encoding, feature filtering, and model fitting.
 
-################################ CLASSIFIERS ###################################
-class Model():
-    """Generic class for performing Leave-One-Out Cross Validation using a given classifier.
+    The pipeline optionally applies SMOTEN oversampling, one-hot encoding
+    for categorical variables, variance thresholding, univariate feature
+    selection, and a final classifier.
 
     Parameters
     ----------
-    name : str
-        Name of classifier pipeline.
-    classifier : sklearn-compatible estimator
-        A classifier implementing the scikit-learn estimator interface. Must provide
-        `fit`, `predict`, and `predict_proba` methods.
-    feature_scoring_method : sklearn-compatible feature selection method
-        Scoring function to rank features by predictive power (default is `f_classif`).
-    num_features : int
-        Number of features selected by `SelectKBest`.
-    var_threshold = float
-        Minimum variance for a given feature in the training data required to be kept 
-        using `VarianceThreshold`.
+    clf : estimator object
+        A scikit-learn compatible classifier implementing `fit` and `predict`.
+
+    smote : bool, default=True
+        If True, applies SMOTEN oversampling to handle class imbalance.
+
+    onehot : bool, default=True
+        If True, applies one-hot encoding to predefined categorical columns.
+
+    var_filter__threshold : float, default=0.16
+        Features with variance below this threshold are removed via
+        `VarianceThreshold`.
+
+    ft_filter__k : int, default=9
+        Number of top features to select using univariate ANOVA F-test
+        (`SelectKBest` with `f_classif`).
+
+    random_state : int or None, default=_RANDOM_STATE
+        Random seed used for reproducibility in SMOTEN.
+
+    Returns
+    -------
+    sklearn.pipeline.Pipeline
+        A configured pipeline consisting of optional SMOTEN sampling,
+        optional one-hot encoding, variance filtering, feature selection,
+        and the final classifier.
     """
+    steps = []
 
-    def __init__(self, 
-                 name,
-                 classifier,
-                 feature_scoring_method=f_classif,
-                 num_features=8,
-                 var_threshold=0.8 * (1-0.8)):
-        self.name = name
-        self.classifier = classifier
-        self.variance_filter = VarianceThreshold(threshold=var_threshold)
-        self.feature_filter = SelectKBest(score_func=feature_scoring_method, 
-                                          k=num_features)
-        self.pipeline = make_pipeline(
-            self.variance_filter,
-            self.feature_filter,
-            self.classifier
-        )
+    if smote:
+        steps.append(("smote", SMOTEN(random_state=random_state)))
 
-    def split_data(self, X, y, train_idxs, test_idxs):
-        """Divide input data into train and test sets."""
-        return X[train_idxs], y[train_idxs], X[test_idxs], y[test_idxs]
-    
-    def fit(self, X_train, y_train):
-        """Fit pre-processing and classification pipeline onto training data."""
-        self.pipeline.fit(X_train, y_train)
-    
-    def predict(self, X_test):
-        """Generate class label predictions from fitted pipeline on test data."""
-        return self.pipeline.predict(X_test)
-    
-    def predict_proba(self, X_test):
-        """Generate class label probabilities from fitted pipeline on test data."""
-        return self.pipeline.predict_proba(X_test)
-    
-    def eval_accuracy(self, y_truth, y_preds):
-        """Calculate accuracy from predicted class labels versus ground truth."""
-        return accuracy_score(y_truth, y_preds)
-
-    def eval_f1_score(self, y_truth, y_preds, average='weighted'):
-        """Calculate F1 score from predicted class labels versus ground truth."""
-        return f1_score(y_truth, y_preds, average=average)
-
-    def eval_auc(self, y_truth, y_preds):
-        """Calculate AUC for ROC from predicted class probabilities versus grouth truth."""
-        return roc_auc_score(y_truth, y_preds, multi_class='ovr')
-    
-    def eval_confusion_matrix(self, y_truth, y_preds):
-        """Compute confusion matrix based on ground truth labels and corresponding predictions."""
-        return confusion_matrix(y_truth, y_preds)
-    
-    def get_confusion_matrix(self, confusion_matrix, class_labels, save_to=None, show=False):
-        """Generate a heatmap visualization of a confusion matrix.
-        
-        Parameters
-        ----------
-        confusion_matrix : array-like of shape (n_classes, n_classes)
-            Confusion matrix containing counts of predicted versus true labels.
-        class_labels: list of str
-            Labels corresponding to each class, used to annotate the axes of the
-            confusion matrix.
-        save_to : str or None, default=None
-            File path to save the figure as a PNG image. If `None`, the figure
-            is not saved.
-        show : bool, default=False
-            If `True`, display the figure using `plt.show()`.
-
-        Returns
-        -------
-        plt : matplotplib.pyplot
-            The matplotlib pyplot module containing the generated figure.
-        """
-        sns.set_theme(style="white", font_scale=1.2)
-        plt.figure(figsize=(4, 4))
-        ax = sns.heatmap(confusion_matrix, 
-                        annot=True, 
-                        square=True, 
-                        xticklabels=class_labels, 
-                        yticklabels=class_labels, 
-                        cmap='RdPu', 
-                        fmt="d",
-                        cbar_kws={"shrink": 0.85})
-        ax.xaxis.tick_top()
-        ax.yaxis.tick_left()
-        ax.set_xticklabels(class_labels, fontsize=14)
-        ax.set_yticklabels(class_labels, fontsize=14)
-        plt.xlabel(self.name, fontsize=14, labelpad=11)
-        plt.yticks(rotation=0)
-        plt.xticks(rotation=0)
-        if save_to:
-            plt.savefig(save_to, 
-                        format="png", 
-                        bbox_inches='tight', 
-                        dpi=600)
-        if show:
-            plt.show()
-        return plt
-    
-    def loocv_eval(self, X, y):
-        """Perform Leave-One-Out Cross Validation on the dataset.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Ground truth target labels.
-
-        Returns
-        -------
-        accuracy : float
-            Classification accuracy across all folds.
-        f1_score : float
-            Weighted F1 score across all folds.
-        auc_roc : float
-            One-vs-rest multiclass ROC AUC score.
-        confusion_matrix : ndarray of shape (n_classes, n_classes)
-            Confusion matrix summarizing predictions.        
-        """
-
-        preds = []
-        probs = []
-        y_truth = []
-        for fold, (train_idx, test_idx) in enumerate(LeaveOneOut().split(X=X)):
-            X_train, y_train, X_test, y_test = self.split_data(X, y, train_idx, test_idx)
-            self.fit(X_train, y_train)
-            preds.append(self.predict(X_test))
-            probs.append(self.predict_proba(X_test)[0])
-            y_truth.append(y_test)
-        preds = np.concatenate(preds, axis=0)       # shape: (n_samples,)
-        probs = np.array(probs)                     # shape: (n_samples, n_classes)
-        y_truth = np.concatenate(y_truth, axis=0)   # shape: (n_samples,)
-        accuracy = self.eval_accuracy(y_truth, preds)
-        f1_score = self.eval_f1_score(y_truth, preds)
-        auc_roc = self.eval_auc(y_truth, probs)
-        confusion_matrix = self.eval_confusion_matrix(y_truth, preds)
-        return accuracy, f1_score, auc_roc, confusion_matrix
-    
-    def fold_cv_eval(self, X, y, n_folds):
-        """Perform k-fold cross validation on the dataset.
-        
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Feature matrix.
-        y : array-like of shape (n_samples,)
-            Ground truth target labels.
-        n_folds : int
-            Number of folds to perform cross validation.
-
-        Returns
-        -------
-        accuracy : float
-            Classification accuracy across all folds.
-        f1_score : float
-            Weighted F1 score across all folds.
-        auc_roc : float
-            One-vs-rest multiclass ROC AUC score.
-        confusion_matrix : ndarray of shape (n_classes, n_classes)
-            Confusion matrix summarizing predictions.       
-        """
-
-        agg_preds_list = []
-        agg_y_truths_list = []
-
-        accuracies = []
-        f1_scores = []
-        auc_rocs = []
-        kfolds = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state = 42)
-        for fold, (train_idx, test_idx) in enumerate(kfolds.split(X=X, y=y)):
-            X_train, y_train, X_test, y_test = self.split_data(X, y, train_idx, test_idx)
-            self.fit(X_train, y_train)
-            preds = self.predict(X_test)
-            probs = self.predict_proba(X_test)
-
-            accuracies.append(self.eval_accuracy(y_test, preds))
-            f1_scores.append(self.eval_f1_score(y_test, preds))
-            auc_rocs.append(self.eval_auc(y_test, probs))
+    if onehot:
+        # delete
+        from sklearn.naive_bayes import GaussianNB
+        if isinstance(clf, GaussianNB):
+            steps.append(("onehot", ColumnTransformer(
+            [("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False), _CATEGORICAL_COLS)],
+            remainder='passthrough'
+        )))
             
-            agg_preds_list.append(preds)
-            agg_y_truths_list.append(y_test)
+        else:
+            steps.append(("onehot", ColumnTransformer(
+                [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
+                remainder='passthrough'
+            )))
 
-        agg_preds = np.concatenate(agg_preds_list, axis=0)
-        agg_y_truths = np.concatenate(agg_y_truths_list, axis=0)
-        confusion_matrix = self.eval_confusion_matrix(agg_y_truths, agg_preds)
-        return np.mean(accuracies), np.mean(f1_scores), np.mean(auc_rocs), confusion_matrix
-
-    
-# Naive Bayes
-nb_classifier = BernoulliNB()
-nb_model = Model(name='Naive Bayes', classifier=nb_classifier)
-
-# Multi-Layer Perceptron
-mlp_classifier = MLPClassifier(hidden_layer_sizes = (100, 100),
-                                    activation='relu', 
-                                    solver='lbfgs',
-                                    random_state=42,
-                                    max_iter=5000)
-mlp_model = Model(name='Multi-Layer Perceptron', classifier=mlp_classifier)
-
-# Deep Neural Network
-dnn_classifier = MLPClassifier(hidden_layer_sizes = (100, 100, 100),
-                                    activation='relu', 
-                                    solver='lbfgs',
-                                    random_state=42,
-                                    max_iter=5000)
-dnn_model = Model(name='Deep Neural Network', classifier=dnn_classifier)
+    steps += [
+        ("var_filter", VarianceThreshold(threshold=var_filter__threshold)),
+        ("ft_filter", SelectKBest(score_func=f_classif, k=ft_filter__k)),
+        ("clf", clf)
+    ]
+    return Pipeline(steps)
 
 
-# K-Nearest Neighbor
-knn_classifier = KNeighborsClassifier(n_neighbors=10,
-                                    metric='hamming')
-knn_model = Model(name='K-Nearest Neighbor', classifier=knn_classifier)
-        
+# DEFINE MODELS
 
-# Decision Tree
-dt_classifier = DecisionTreeClassifier(criterion='gini',
-                                    max_depth=6)
-dt_model = Model(name='Decision Tree', classifier=dt_classifier)
+####################### ORIGINAL HYPERPARAMS ###################################
+# knn_classifier = make_rew_classifier(
+#     clf=KNeighborsClassifier(
+#         n_neighbors=9
+#     ),
+#     smote=True,    
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
+# dt_classifier = make_rew_classifier(
+#     clf=DecisionTreeClassifier(
+#         max_depth=10
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=8
+# )
 
-# Random Forest
-rf_classifier = RandomForestClassifier(n_estimators=100,
-                                    criterion='gini',
-                                    bootstrap=True,
-                                    max_depth=6)
-rf_model = Model(name='Random Forest', classifier=rf_classifier)
+# rf_classifier = make_rew_classifier(
+#     clf=RandomForestClassifier(
+#         max_depth=5
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
+# fnn_classifier = make_rew_classifier(
+#     clf=MLPClassifier(
+#         random_state=0,
+#         max_iter=5000
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
-# Support Vector Machine
-svc_classifier = SVC(probability=True)
-svc_model = Model(name='Support Vector Machine', classifier=svc_classifier)
+# svm_classifier = make_rew_classifier(
+#     clf=SVC(
+#         gamma="auto",
+#         probability=True
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
+# lr_classifier = make_rew_classifier(
+#     clf=LogisticRegression(
+#         l1_ratio=0
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
-# Logistic Regression
-lr_classifier = LogisticRegression(l1_ratio=0)
-lr_model = Model(name='Logistic Regression', classifier=lr_classifier)
+# ann_classifier = make_rew_classifier(
+#     clf=MLPClassifier(
+#         hidden_layer_sizes=(100,100),
+#         max_iter=5000,
+#         random_state=0
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=9
+# )
 
+# from sklearn.naive_bayes import GaussianNB
+# nb_classifier = make_rew_classifier(
+#     clf=GaussianNB(),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=8
+# )
+################################################################################
 
-models = [nb_model, mlp_model, dnn_model, knn_model, dt_model, rf_model, svc_model, lr_model]
+######################### TUNED HYPERPARAMS ###################################
+# knn_classifier = make_rew_classifier(
+#     clf=KNeighborsClassifier(
+#         n_neighbors=9,
+#         p=2,
+#         weights='uniform'
+#     ),
+#     smote=False,    
+#     var_filter__threshold=0.1,
+#     ft_filter__k=7
+# )
+
+# dt_classifier = make_rew_classifier(
+#     clf=DecisionTreeClassifier(
+#         min_samples_split=5,
+#         min_samples_leaf=2,
+#         max_features="log2",
+#         max_depth=10,
+#         criterion="gini",
+#         class_weight="balanced",
+#         ccp_alpha=0.01
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.1,
+#     ft_filter__k=9
+# )
+
+# rf_classifier = make_rew_classifier(
+#     clf=RandomForestClassifier(
+#         n_estimators=200,
+#         max_depth=5,
+#         min_samples_leaf=5,
+#         min_samples_split=5,
+#         max_features="sqrt",
+#         class_weight="balanced",
+#         ccp_alpha=1e-3
+#     ),
+#     smote=False,
+#     var_filter__threshold=0,
+#     ft_filter__k=9
+# )
+
+# fnn_classifier = make_rew_classifier(
+#     clf=MLPClassifier(
+#         activation="tanh",
+#         max_iter=1000
+#     ),
+#     smote=False,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=7
+# )
+
+# svm_classifier = make_rew_classifier(
+#     clf=SVC(
+#         kernel="rbf",
+#         gamma="auto",
+#         degree=2,
+#         class_weight="balanced",
+#         C=0.01,
+#         probability=True
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=7
+# )
+
+# lr_classifier = make_rew_classifier(
+#     clf=LogisticRegression(
+#         solver="lbfgs",
+#         l1_ratio=0,
+#         max_iter=200,
+#         class_weight="balanced",
+#         C=0.001
+#     ),
+#     smote=True,
+#     var_filter__threshold=0.16,
+#     ft_filter__k=7
+# )
+
+# ann_classifier = make_rew_classifier(
+#     clf=MLPClassifier(
+#         hidden_layer_sizes=(16,),
+#         activation='relu',
+#         max_iter=200,
+#     ),
+#     smote=False,
+#     var_filter__threshold=0.05,
+#     ft_filter__k=9
+# )
+
+# nb_classifier = make_rew_classifier(
+#     clf=BernoulliNB(
+#         alpha=0
+#     ),
+#     smote=False,
+#     var_filter__threshold=0,
+#     ft_filter__k=9
+# )
+################################################################################
+
+############################## ALL SMOTE #######################################
+knn_classifier = make_rew_classifier(
+    clf=KNeighborsClassifier(
+        n_neighbors=9,
+        p=2,
+        weights='uniform'
+    ),
+    smote=True,    
+    var_filter__threshold=0.1,
+    ft_filter__k=7
+)
+
+dt_classifier = make_rew_classifier(
+    clf=DecisionTreeClassifier(
+        min_samples_split=5,
+        min_samples_leaf=2,
+        max_features="log2",
+        max_depth=10,
+        criterion="gini",
+        class_weight="balanced",
+        ccp_alpha=0.01
+    ),
+    smote=True,
+    var_filter__threshold=0.1,
+    ft_filter__k=9
+)
+
+rf_classifier = make_rew_classifier(
+    clf=RandomForestClassifier(
+        n_estimators=200,
+        max_depth=5,
+        min_samples_leaf=5,
+        min_samples_split=5,
+        max_features="sqrt",
+        class_weight="balanced",
+        ccp_alpha=1e-3
+    ),
+    smote=True,
+    var_filter__threshold=0,
+    ft_filter__k=9
+)
+
+fnn_classifier = make_rew_classifier(
+    clf=MLPClassifier(
+        activation="tanh",
+        max_iter=1000
+    ),
+    smote=True,
+    var_filter__threshold=0.16,
+    ft_filter__k=7
+)
+
+svm_classifier = make_rew_classifier(
+    clf=SVC(
+        kernel="rbf",
+        gamma="auto",
+        degree=2,
+        class_weight="balanced",
+        C=0.01,
+        probability=True
+    ),
+    smote=True,
+    var_filter__threshold=0.16,
+    ft_filter__k=7
+)
+
+lr_classifier = make_rew_classifier(
+    clf=LogisticRegression(
+        solver="lbfgs",
+        l1_ratio=0,
+        max_iter=200,
+        class_weight="balanced",
+        C=0.001
+    ),
+    smote=True,
+    var_filter__threshold=0.16,
+    ft_filter__k=7
+)
+
+ann_classifier = make_rew_classifier(
+    clf=MLPClassifier(
+        hidden_layer_sizes=(16,),
+        activation='relu',
+        max_iter=200,
+    ),
+    smote=True,
+    var_filter__threshold=0.05,
+    ft_filter__k=9
+)
+
+nb_classifier = make_rew_classifier(
+    clf=BernoulliNB(
+        alpha=0
+    ),
+    smote=True,
+    var_filter__threshold=0,
+    ft_filter__k=9
+)
+################################################################################
+
+models = {
+    "K-Nearest Neighbors": knn_classifier,
+    "Decision Tree": dt_classifier,
+    "Random Forest": rf_classifier,
+    "Feed-Forward Neural Network": fnn_classifier,
+    "Support Vector Machine": svm_classifier,
+    "Logistic Regression": lr_classifier,
+    "Deep Neural Network": ann_classifier,
+    "Naive Bayes": nb_classifier
+}
