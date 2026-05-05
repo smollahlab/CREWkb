@@ -64,19 +64,14 @@ def make_rew_classifier(
         steps.append(("smote", SMOTEN(random_state=random_state)))
 
     if onehot:
-        # delete
-        from sklearn.naive_bayes import GaussianNB
-        if isinstance(clf, GaussianNB):
-            steps.append(("onehot", ColumnTransformer(
-            [("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False), _CATEGORICAL_COLS)],
+        steps.append(("onehot", ColumnTransformer(
+            [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
             remainder='passthrough'
         )))
-            
-        else:
-            steps.append(("onehot", ColumnTransformer(
-                [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
-                remainder='passthrough'
-            )))
+        steps.append(("onehot", ColumnTransformer(
+            [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
+            remainder='passthrough'
+        )))
 
     steps += [
         ("var_filter", VarianceThreshold(threshold=var_filter__threshold)),
@@ -87,232 +82,44 @@ def make_rew_classifier(
 
 
 # DEFINE MODELS
-
-####################### ORIGINAL HYPERPARAMS ###################################
-# knn_classifier = make_rew_classifier(
-#     clf=KNeighborsClassifier(
-#         n_neighbors=9
-#     ),
-#     smote=True,    
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# dt_classifier = make_rew_classifier(
-#     clf=DecisionTreeClassifier(
-#         max_depth=10
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=8
-# )
-
-# rf_classifier = make_rew_classifier(
-#     clf=RandomForestClassifier(
-#         max_depth=5
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# fnn_classifier = make_rew_classifier(
-#     clf=MLPClassifier(
-#         random_state=0,
-#         max_iter=5000
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# svm_classifier = make_rew_classifier(
-#     clf=SVC(
-#         gamma="auto",
-#         probability=True
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# lr_classifier = make_rew_classifier(
-#     clf=LogisticRegression(
-#         l1_ratio=0
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# ann_classifier = make_rew_classifier(
-#     clf=MLPClassifier(
-#         hidden_layer_sizes=(100,100),
-#         max_iter=5000,
-#         random_state=0
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=9
-# )
-
-# from sklearn.naive_bayes import GaussianNB
-# nb_classifier = make_rew_classifier(
-#     clf=GaussianNB(),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=8
-# )
-################################################################################
-
-######################### TUNED HYPERPARAMS ###################################
-# knn_classifier = make_rew_classifier(
-#     clf=KNeighborsClassifier(
-#         n_neighbors=9,
-#         p=2,
-#         weights='uniform'
-#     ),
-#     smote=False,    
-#     var_filter__threshold=0.1,
-#     ft_filter__k=7
-# )
-
-# dt_classifier = make_rew_classifier(
-#     clf=DecisionTreeClassifier(
-#         min_samples_split=5,
-#         min_samples_leaf=2,
-#         max_features="log2",
-#         max_depth=10,
-#         criterion="gini",
-#         class_weight="balanced",
-#         ccp_alpha=0.01
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.1,
-#     ft_filter__k=9
-# )
-
-# rf_classifier = make_rew_classifier(
-#     clf=RandomForestClassifier(
-#         n_estimators=200,
-#         max_depth=5,
-#         min_samples_leaf=5,
-#         min_samples_split=5,
-#         max_features="sqrt",
-#         class_weight="balanced",
-#         ccp_alpha=1e-3
-#     ),
-#     smote=False,
-#     var_filter__threshold=0,
-#     ft_filter__k=9
-# )
-
-# fnn_classifier = make_rew_classifier(
-#     clf=MLPClassifier(
-#         activation="tanh",
-#         max_iter=1000
-#     ),
-#     smote=False,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=7
-# )
-
-# svm_classifier = make_rew_classifier(
-#     clf=SVC(
-#         kernel="rbf",
-#         gamma="auto",
-#         degree=2,
-#         class_weight="balanced",
-#         C=0.01,
-#         probability=True
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=7
-# )
-
-# lr_classifier = make_rew_classifier(
-#     clf=LogisticRegression(
-#         solver="lbfgs",
-#         l1_ratio=0,
-#         max_iter=200,
-#         class_weight="balanced",
-#         C=0.001
-#     ),
-#     smote=True,
-#     var_filter__threshold=0.16,
-#     ft_filter__k=7
-# )
-
-# ann_classifier = make_rew_classifier(
-#     clf=MLPClassifier(
-#         hidden_layer_sizes=(16,),
-#         activation='relu',
-#         max_iter=200,
-#     ),
-#     smote=False,
-#     var_filter__threshold=0.05,
-#     ft_filter__k=9
-# )
-
-# nb_classifier = make_rew_classifier(
-#     clf=BernoulliNB(
-#         alpha=0
-#     ),
-#     smote=False,
-#     var_filter__threshold=0,
-#     ft_filter__k=9
-# )
-################################################################################
-
-############################## ALL SMOTE #######################################
 knn_classifier = make_rew_classifier(
     clf=KNeighborsClassifier(
         n_neighbors=9,
         p=2,
         weights='uniform'
     ),
-    smote=True,    
+    smote=False,    
     var_filter__threshold=0.1,
     ft_filter__k=7
 )
 
 dt_classifier = make_rew_classifier(
     clf=DecisionTreeClassifier(
-        min_samples_split=5,
-        min_samples_leaf=2,
-        max_features="log2",
         max_depth=10,
-        criterion="gini",
-        class_weight="balanced",
-        ccp_alpha=0.01
+        random_state=_RANDOM_STATE
     ),
     smote=True,
-    var_filter__threshold=0.1,
-    ft_filter__k=9
+    var_filter__threshold=0.16,
+    ft_filter__k=8
 )
 
 rf_classifier = make_rew_classifier(
     clf=RandomForestClassifier(
-        n_estimators=200,
         max_depth=5,
-        min_samples_leaf=5,
-        min_samples_split=5,
-        max_features="sqrt",
-        class_weight="balanced",
-        ccp_alpha=1e-3
+        random_state=_RANDOM_STATE
     ),
     smote=True,
-    var_filter__threshold=0,
+    var_filter__threshold=0.16,
     ft_filter__k=9
 )
 
 fnn_classifier = make_rew_classifier(
     clf=MLPClassifier(
         activation="tanh",
-        max_iter=1000
+        max_iter=1000,
+        random_state=_RANDOM_STATE
     ),
-    smote=True,
+    smote=False,
     var_filter__threshold=0.16,
     ft_filter__k=7
 )
@@ -324,7 +131,8 @@ svm_classifier = make_rew_classifier(
         degree=2,
         class_weight="balanced",
         C=0.01,
-        probability=True
+        probability=True,
+        random_state=_RANDOM_STATE
     ),
     smote=True,
     var_filter__threshold=0.16,
@@ -337,7 +145,8 @@ lr_classifier = make_rew_classifier(
         l1_ratio=0,
         max_iter=200,
         class_weight="balanced",
-        C=0.001
+        C=0.001,
+        random_state=_RANDOM_STATE
     ),
     smote=True,
     var_filter__threshold=0.16,
@@ -349,8 +158,9 @@ ann_classifier = make_rew_classifier(
         hidden_layer_sizes=(16,),
         activation='relu',
         max_iter=200,
+        random_state=_RANDOM_STATE
     ),
-    smote=True,
+    smote=False,
     var_filter__threshold=0.05,
     ft_filter__k=9
 )
@@ -359,11 +169,11 @@ nb_classifier = make_rew_classifier(
     clf=BernoulliNB(
         alpha=0
     ),
-    smote=True,
+    smote=False,
     var_filter__threshold=0,
     ft_filter__k=9
 )
-################################################################################
+
 
 models = {
     "K-Nearest Neighbors": knn_classifier,

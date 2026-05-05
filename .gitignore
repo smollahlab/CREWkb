@@ -4,8 +4,6 @@ __pycache__
 
 # DEVELOPMENT
 deprecate/
-orig_hpp/
-smote_hpp/
-tuned_hpp/
+*_hpp/
 best_params.json
 hyperparam_tuning.ipynb
