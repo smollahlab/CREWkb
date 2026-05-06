@@ -1,0 +1,70 @@
+random_state: &rs 42
+
+models:
+  "K-Nearest Neighbors":
+    n_neighbors: 9
+    p: 2
+    weights: "uniform"
+    smote: false
+    var_filter__threshold: 0.1
+    ft_filter__k: 7
+
+  "Decision Tree":
+    max_depth: 10
+    random_state: *rs
+    smote: true
+    var_filter__threshold: 0.16
+    ft_filter__k: 8
+
+  "Random Forest":
+    max_depth: 5
+    random_state: *rs
+    smote: true
+    var_filter__threshold: 0.16
+    ft_filter__k: 9
+
+  "Feed-Forward Neural Network":
+    activation: "tanh"
+    max_iter: 1000
+    random_state: *rs
+    smote: false
+    var_filter__threshold: 0.16
+    ft_filter__k: 7
+
+  "Support Vector Classifier":
+    kernel: "rbf"
+    gamma: "auto"
+    degree: 2
+    class_weight: "balanced"
+    C: 0.01
+    probability: true
+    random_state: *rs
+    smote: true
+    var_filter__threshold: 0.16
+    ft_filter__k: 7
+
+  "Logistic Regression":
+    solver: "lbfgs"
+    l1_ratio: 0
+    max_iter: 200
+    class_weight: "balanced"
+    C: 0.001
+    random_state: *rs
+    smote: true
+    var_filter__threshold: 0.16
+    ft_filter__k: 7
+
+  "Deep Neural Network":
+    hidden_layer_sizes: [16]
+    activation: "relu"
+    max_iter: 200
+    random_state: *rs
+    smote: false
+    var_filter__threshold: 0.05
+    ft_filter__k: 9
+
+  "Naive Bayes":
+    alpha: 0
+    smote: false
+    var_filter__threshold: 0
+    ft_filter__k: 9

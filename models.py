@@ -1,3 +1,4 @@
+import warnings
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectKBest, VarianceThreshold, f_classif
@@ -14,7 +15,7 @@ from imblearn.over_sampling import SMOTEN
 from utils import _RANDOM_STATE, _CATEGORICAL_COLS
 
 
-def make_rew_classifier(
+def make_pipeline(
     clf,
     smote=True,
     onehot=True,
@@ -68,10 +69,6 @@ def make_rew_classifier(
             [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
             remainder='passthrough'
         )))
-        steps.append(("onehot", ColumnTransformer(
-            [("onehot", OneHotEncoder(handle_unknown="ignore"), _CATEGORICAL_COLS)],
-            remainder='passthrough'
-        )))
 
     steps += [
         ("var_filter", VarianceThreshold(threshold=var_filter__threshold)),
@@ -81,107 +78,82 @@ def make_rew_classifier(
     return Pipeline(steps)
 
 
-# DEFINE MODELS
-knn_classifier = make_rew_classifier(
-    clf=KNeighborsClassifier(
-        n_neighbors=9,
-        p=2,
-        weights='uniform'
-    ),
-    smote=False,    
-    var_filter__threshold=0.1,
-    ft_filter__k=7
-)
+def custom_models(param_dict):
+    """Initialize REW classifiers with user-specified model hyperparameters.
 
-dt_classifier = make_rew_classifier(
-    clf=DecisionTreeClassifier(
-        max_depth=10,
-        random_state=_RANDOM_STATE
-    ),
-    smote=True,
-    var_filter__threshold=0.16,
-    ft_filter__k=8
-)
+    Parameters
+    ----------
+    param_dict : dict
+        Dictionary mapping model names (str) to parameter dictionaries (dict).
+        Each parameter dictionary may contain:
+        - valid sklearn estimator hyperparameters
+        - pipeline-specific keys:
+            - "smote"
+            - "var_filter__threshold"
+            - "ft_filter__k"
 
-rf_classifier = make_rew_classifier(
-    clf=RandomForestClassifier(
-        max_depth=5,
-        random_state=_RANDOM_STATE
-    ),
-    smote=True,
-    var_filter__threshold=0.16,
-    ft_filter__k=9
-)
+    Returns
+    -------
+    dict
+        Dictionary mapping model names (str) to sklearn Pipeline objects.
+    """
+    _PIPE_PARAMS = ["smote", "var_filter__threshold", "ft_filter__k"]
+    models = {}
+    for model_type, params in param_dict["models"].items():
+        # determine classifier type
+        if model_type == "K-Nearest Neighbors":
+            clf = KNeighborsClassifier()
+        elif model_type == "Decision Tree":
+            clf = DecisionTreeClassifier()
+        elif model_type == "Random Forest":
+            clf = RandomForestClassifier()
+        elif model_type == "Feed-Forward Neural Network":
+            clf = MLPClassifier()
+        elif model_type == "Support Vector Classifier":
+            clf = SVC()
+        elif model_type == "Logistic Regression":
+            clf = LogisticRegression()
+        elif model_type == "Deep Neural Network":
+            clf = MLPClassifier()
+        elif model_type == "Naive Bayes":
+            clf = BernoulliNB()
+        else:
+            warnings.warn(f"Model type {model_type} not recognized.")
+            continue
+        
+        # filter invalid parameters for the given classifier
+        clf_params = {}
+        for p, v in params.items():
+            if p in _PIPE_PARAMS:
+                continue
+            if not p in clf.get_params():
+                warnings.warn(f"{p} is not recognized as a valid parameter for {model_type}.")
+                continue
+            clf_params[p] = v
+        
+        # update classifier, create pipeline, and append to list of models
+        clf.set_params(**clf_params)
+        pipe_params = {"clf": clf}
+        if "smote" in params:
+            pipe_params["smote"] = params["smote"]
+        if "var_filter__threshold" in params:
+            pipe_params["var_filter__threshold"] = params["var_filter__threshold"]
+        if "ft_filter__k" in params:
+            pipe_params["ft_filter__k"] = params["ft_filter__k"]
+        pipe = make_pipeline(**pipe_params)
+        models[model_type] = pipe
 
-fnn_classifier = make_rew_classifier(
-    clf=MLPClassifier(
-        activation="tanh",
-        max_iter=1000,
-        random_state=_RANDOM_STATE
-    ),
-    smote=False,
-    var_filter__threshold=0.16,
-    ft_filter__k=7
-)
-
-svm_classifier = make_rew_classifier(
-    clf=SVC(
-        kernel="rbf",
-        gamma="auto",
-        degree=2,
-        class_weight="balanced",
-        C=0.01,
-        probability=True,
-        random_state=_RANDOM_STATE
-    ),
-    smote=True,
-    var_filter__threshold=0.16,
-    ft_filter__k=7
-)
-
-lr_classifier = make_rew_classifier(
-    clf=LogisticRegression(
-        solver="lbfgs",
-        l1_ratio=0,
-        max_iter=200,
-        class_weight="balanced",
-        C=0.001,
-        random_state=_RANDOM_STATE
-    ),
-    smote=True,
-    var_filter__threshold=0.16,
-    ft_filter__k=7
-)
-
-ann_classifier = make_rew_classifier(
-    clf=MLPClassifier(
-        hidden_layer_sizes=(16,),
-        activation='relu',
-        max_iter=200,
-        random_state=_RANDOM_STATE
-    ),
-    smote=False,
-    var_filter__threshold=0.05,
-    ft_filter__k=9
-)
-
-nb_classifier = make_rew_classifier(
-    clf=BernoulliNB(
-        alpha=0
-    ),
-    smote=False,
-    var_filter__threshold=0,
-    ft_filter__k=9
-)
+    return models
 
 
-models = {
-    "K-Nearest Neighbors": knn_classifier,
-    "Decision Tree": dt_classifier,
-    "Random Forest": rf_classifier,
-    "Feed-Forward Neural Network": fnn_classifier,
-    "Support Vector Machine": svm_classifier,
-    "Logistic Regression": lr_classifier,
-    "Deep Neural Network": ann_classifier,
-    "Naive Bayes": nb_classifier
-}
+def default_models():
+    return {
+        "K-Nearest Neighbors": make_pipeline(KNeighborsClassifier()),
+        "Decision Tree": make_pipeline(DecisionTreeClassifier()),
+        "Random Forest": make_pipeline(RandomForestClassifier()),
+        "Feed-Forward Neural Network": make_pipeline(MLPClassifier()),
+        "Support Vector Machine": make_pipeline(SVC()),
+        "Logistic Regression": make_pipeline(LogisticRegression()),
+        "Deep Neural Network": make_pipeline(MLPClassifier()),
+        "Naive Bayes": make_pipeline(BernoulliNB())
+    }

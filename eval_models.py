@@ -1,11 +1,13 @@
 import argparse
 import pandas as pd
-from pathlib import Path
+import yaml
 
-from generate_figures import *
-from models import models
+from pathlib import Path
+from figures import *
+from models import *
 from utils import clean_data, _RANDOM_STATE
 from validation import loocv, kfoldcv
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -32,10 +34,18 @@ if __name__ == "__main__":
         default="./",
         help="Output directory."
     )
+    parser.add_argument(
+        "-p",
+        "--params",
+        type=str,
+        default="",
+        help="YAML file for hyperparameters."
+    )
     args = parser.parse_args()
     in_file = args.input
     n_folds = args.n_folds
     outdir = args.outdir
+    params_path = args.params
 
     out_path = Path(outdir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -43,11 +53,13 @@ if __name__ == "__main__":
     raw = pd.read_csv(in_file)
     X, y, class_labels = clean_data(raw)
 
-    ##########
-    # demo_ = ["K-Nearest Neighbors", "Decision Tree", "Support Vector Machine"]
-    # models_demo = {m: models[m] for m in demo_}
-    # models = models_demo
-    ##########
+    
+    if params_path:
+        with open(Path(params_path), "r") as f:
+            params = yaml.safe_load(f)
+        models = custom_models(params)
+    else:
+        models = default_models()
 
     metrics = ['Accuracy', 'F1 Score', 'AUC', 'MCC', 'Confusion Matrix']
     loocv_metrics = []
@@ -93,6 +105,7 @@ if __name__ == "__main__":
         loocv_df, 
         ymin=0.7,
         ymax=1,
+        yspacing=0.025,
         title="LOOCV",
         save_to=out_path / f"loocv_barchart.png"
     )
@@ -100,6 +113,7 @@ if __name__ == "__main__":
         kfold_df, 
         ymin=0.7,
         ymax=1,
+        yspacing=0.025,
         title="5-Fold",
         save_to=out_path / f"kfoldcv_barchart.png"
     )

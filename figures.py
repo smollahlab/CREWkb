@@ -1,3 +1,4 @@
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -169,7 +170,14 @@ def _long_df(wide_df, var_name="Metric", in_place=False):
     )
 
 
-def all_metric_bar_chart(df, ymin=0, ymax=1, title=None, save_to=None):
+def all_metric_bar_chart(
+        df, 
+        ymin=0, 
+        ymax=1, 
+        yspacing=0.1, 
+        title=None, 
+        save_to=None
+    ):
     """Create a grouped bar chart of model metrics.
 
     Parameters
@@ -181,6 +189,8 @@ def all_metric_bar_chart(df, ymin=0, ymax=1, title=None, save_to=None):
         Lower limit for the y-axis. Default is 0.
     ymax : float, optional
         Upper limit for the y-axis. Default is 1.
+    yspacing : float, optional
+        Spacing between lines on the y-axis. Default is 0.1.
     title : str or None, optional
         Title for the plot. If None, no title is set.
     save_to : str or None, optional
@@ -214,7 +224,8 @@ def all_metric_bar_chart(df, ymin=0, ymax=1, title=None, save_to=None):
         # format axes and spines
         sns.despine()
         ax.set_ylim(ymin, ymax)
-        ax.set_yticks(np.linspace(ymin, ymax, 9))
+        ax.yaxis.set_major_locator(MultipleLocator(yspacing))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
         ax.yaxis.grid(True)
 
         for label in ax.get_xticklabels():
@@ -251,8 +262,9 @@ def metric_bar_chart_by_cv(
         loocv_df, 
         kfold_df, 
         metric, 
-        ymin=0.8, 
+        ymin=0, 
         ymax=1, 
+        yspacing=0.1,
         title=None,
         save_to=None
     ):
@@ -273,6 +285,8 @@ def metric_bar_chart_by_cv(
         Lower limit of the y-axis. Default is 0.8.
     ymax : float, optional
         Upper limit of the y-axis. Default is 1.
+    yspacing : float, optional
+        Spacing between lines on the y-axis. Default is 0.1.
     title : str or None, optional
         Title of the plot. If None, no title is added.
     save_to : str or None, optional
@@ -310,7 +324,8 @@ def metric_bar_chart_by_cv(
         # format axes and spines
         sns.despine()
         ax.set_ylim(ymin, ymax)
-        ax.set_yticks(np.linspace(ymin, ymax, 9))
+        ax.yaxis.set_major_locator(MultipleLocator(yspacing))
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
         ax.yaxis.grid(True)
 
         for label in ax.get_xticklabels():
